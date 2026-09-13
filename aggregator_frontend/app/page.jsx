@@ -1,5 +1,5 @@
 import Dashboard from '../components/Dashboard';
-import { normalizeReport } from '../lib/report';
+import { normalizeCustomers } from '../lib/report';
 
 const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8000';
 
@@ -9,17 +9,26 @@ async function fetchInitialData() {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3500);
 
-    const response = await fetch(`${backendUrl}/api/report`, {
+    let response = await fetch(`${backendUrl}/api/customers`, {
       method: 'GET',
       headers: { Accept: 'application/json' },
       cache: 'no-store',
       signal: controller.signal,
     });
+
+    if (!response.ok && response.status === 404) {
+      response = await fetch(`${backendUrl}/api/report?include_all=true`, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+        signal: controller.signal,
+      });
+    }
     clearTimeout(timeout);
 
     if (!response.ok) return null;
     const payload = await response.json();
-    return normalizeReport(payload);
+    return normalizeCustomers(payload);
   } catch {
     return null;
   }

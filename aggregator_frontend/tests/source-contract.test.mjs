@@ -30,6 +30,17 @@ test('dashboard uses Hugeicons and includes the core report experience', () => {
   assert.match(dashboard, /Report Overview/);
   assert.match(dashboard, /Search customers/);
   assert.match(dashboard, /refresh/i);
+  assert.match(dashboard, /BACKEND_API_URL/);
+  assert.match(dashboard, /All customers/);
+  assert.match(dashboard, /Active customers/);
+  assert.match(dashboard, /role="tablist"/);
+});
+
+test('customers API route proxies the configured FastAPI customers endpoint', () => {
+  const source = readRequired('app/api/customers/route.js');
+  assert.match(source, /BACKEND_API_URL/);
+  assert.match(source, /\/api\/customers/);
+  assert.match(source, /no-store/);
 });
 
 test('application source avoids the prohibited UI word', () => {
@@ -46,3 +57,4 @@ test('global styles include responsive breakpoints and focus-visible treatment',
   assert.match(css, /@media/);
   assert.match(css, /focus-visible/);
 });
+

@@ -133,6 +133,37 @@ class TestReportAPI(unittest.IsolatedAsyncioTestCase):
             self.assertIsInstance(payload["data"], list)
             self.assertEqual(len(payload["data"]), 2)
 
+    async def test_generate_report_include_all(self):
+        """Verify that include_all=True returns all 4 customers including Bob and Charlie."""
+        result = await generate_report(include_all=True)
+        self.assertIn("data", result)
+        data = result["data"]
+        user_ids = [item["user_id"] for item in data]
+        self.assertEqual(user_ids, [1, 2, 3, 4])
+
+        bob = next(item for item in data if item["user_id"] == 2)
+        self.assertEqual(bob["order_count"], 0)
+        self.assertEqual(bob["total_spent"], 0.0)
+        self.assertEqual(bob["status"], "Inactive")
+
+        charlie = next(item for item in data if item["user_id"] == 3)
+        self.assertEqual(charlie["order_count"], 0)
+        self.assertEqual(charlie["total_spent"], 0.0)
+        self.assertEqual(charlie["status"], "Inactive")
+
+    async def test_api_customers_http_endpoint_asgi(self):
+        """Test /api/customers endpoint returns all customers with CORS headers."""
+        from httpx import AsyncClient, ASGITransport
+        from main import app
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/api/customers", headers={"Origin": "http://localhost:3000"})
+            self.assertEqual(response.status_code, 200)
+            self.assertIn("access-control-allow-origin", response.headers)
+            payload = response.json()
+            self.assertIn("data", payload)
+            self.assertEqual(len(payload["data"]), 4)
+
 
 if __name__ == "__main__":
     unittest.main()

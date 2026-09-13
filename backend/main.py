@@ -27,7 +27,7 @@ class CustomerReportItem(BaseModel):
     total_spent: float = Field(..., description="Total amount spent across all orders")
     order_count: int = Field(..., description="Total number of valid orders placed")
     average_order_value: float = Field(..., description="Average order value (AOV)")
-    status: Literal["VIP", "Standard"] = Field(..., description="Customer tier based on AOV threshold (> $100 is VIP)")
+    status: Literal["VIP", "Standard", "Inactive"] = Field(..., description="Customer tier based on AOV threshold (> $100 is VIP, Inactive if no orders)")
 
 class ReportResponse(BaseModel):
     data: List[CustomerReportItem]
@@ -62,49 +62,65 @@ async def fetch_orders_for_user(user_id: int):
         
     return orders_db.get(user_id, [])
 
-@app.get("/api/report", response_model=ReportResponse)
-async def generate_report():
+async def build_customers_data(include_all: bool = False):
     """
-    Generate an aggregated user order report.
-
-    - Fetch order data concurrently for better performance.
-    - Treat missing/corrupt order data as empty so one bad record does not crash the report.
-    - Exclude users with no valid orders.
-    - Calculate total spend, order count, AOV, and customer status.
+    Fetch order data concurrently and aggregate spending.
+    If include_all is False, excludes users with no valid orders.
     """
-    logger.info("Starting report generation...")
+    logger.info("Starting customer data generation (include_all=%s)...", include_all)
 
     users = await fetch_users()
 
-    # Fan out the independent order requests concurrently instead of awaiting
-    # each one sequentially. return_exceptions=True keeps one failed upstream
-    # request from crashing the whole report.
     order_results = await asyncio.gather(
         *(fetch_orders_for_user(user["id"]) for user in users),
         return_exceptions=True,
     )
 
-    report = []
+    customers = []
 
     for user, result in zip(users, order_results):
-        # A failed request, None, or another unexpected payload is treated as
-        # no orders for that user and is therefore filtered out below.
         orders = result if isinstance(result, list) else []
 
-        if not orders:
+        if not orders and not include_all:
             continue
 
-        total_spent = sum(order["amount"] for order in orders)
         order_count = len(orders)
-        average_order_value = total_spent / order_count
+        total_spent = sum(order["amount"] for order in orders) if order_count > 0 else 0.0
+        average_order_value = total_spent / order_count if order_count > 0 else 0.0
 
-        report.append({
+        if order_count > 0:
+            status = "VIP" if average_order_value > 100 else "Standard"
+        else:
+            status = "Inactive"
+
+        customers.append({
             "user_id": user["id"],
             "name": user["name"],
             "total_spent": round(total_spent, 2),
             "order_count": order_count,
             "average_order_value": round(average_order_value, 2),
-            "status": "VIP" if average_order_value > 100 else "Standard",
+            "status": status,
         })
 
-    return {"data": report}
+    return customers
+
+@app.get("/api/report", response_model=ReportResponse)
+async def generate_report(include_all: bool = False):
+    """
+    Generate an aggregated user order report.
+
+    - Fetch order data concurrently for better performance.
+    - Treat missing/corrupt order data as empty so one bad record does not crash the report.
+    - Exclude users with no valid orders by default.
+    - Calculate total spend, order count, AOV, and customer status.
+    """
+    data = await build_customers_data(include_all=include_all)
+    return {"data": data}
+
+@app.get("/api/customers", response_model=ReportResponse)
+async def get_all_customers():
+    """
+    Retrieve all customers, including inactive ones with 0 orders.
+    """
+    data = await build_customers_data(include_all=True)
+    return {"data": data}

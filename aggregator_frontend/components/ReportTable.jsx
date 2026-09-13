@@ -1,17 +1,24 @@
 import StatusBadge from './StatusBadge';
 import { formatCurrency } from '../lib/report';
 
-export default function ReportTable({ rows, query = '', onClearQuery }) {
+export default function ReportTable({ rows, query = '', onClearQuery, activeTab = 'all' }) {
   if (!rows.length) {
+    const emptyTitle = query
+      ? 'No matching customers'
+      : activeTab === 'active'
+        ? 'No active customer records'
+        : 'No customer records';
+    const emptyDescription = query
+      ? `No customers match "${query}". Try searching by a different name or status.`
+      : activeTab === 'active'
+        ? 'No active customer orders were found in the current report.'
+        : 'No customer records are currently available.';
+
     return (
       <div className="empty-state" role="status" aria-live="polite">
         <div className="empty-state__mark" aria-hidden="true">0</div>
-        <h3>{query ? 'No matching customers' : 'No active customer records'}</h3>
-        <p>
-          {query
-            ? `No customers match "${query}". Try searching by a different name or status.`
-            : 'No customer orders were found in the current report.'}
-        </p>
+        <h3>{emptyTitle}</h3>
+        <p>{emptyDescription}</p>
         {query && onClearQuery ? (
           <div style={{ marginTop: '16px' }}>
             <button className="button button--light" type="button" onClick={onClearQuery}>

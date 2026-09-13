@@ -92,3 +92,41 @@ test('formatCurrency formats USD values consistently', async () => {
   assert.equal(formatCurrency(undefined), '$0.00');
   assert.equal(formatCurrency(-50.5), '-$50.50');
 });
+
+test('normalizeCustomers includes inactive customers with 0 orders', async () => {
+  const { normalizeCustomers } = await loadReportModule();
+  const input = {
+    data: [
+      sample[0],
+      { user_id: 2, name: 'Bob', total_spent: 0, order_count: 0, average_order_value: 0, status: 'Inactive' },
+      null,
+      sample[1],
+    ],
+  };
+
+  const normalized = normalizeCustomers(input);
+  assert.equal(normalized.length, 3);
+  assert.equal(normalized[1].name, 'Bob');
+  assert.equal(normalized[1].status, 'Inactive');
+  assert.equal(normalized[1].order_count, 0);
+});
+
+test('filterReport filters rows by active tab and search query', async () => {
+  const { filterReport } = await loadReportModule();
+  const customers = [
+    sample[0],
+    { user_id: 2, name: 'Bob', total_spent: 0, order_count: 0, average_order_value: 0, status: 'Inactive' },
+    sample[1],
+  ];
+
+  // All customers tab
+  assert.equal(filterReport(customers, '', 'all').length, 3);
+  assert.deepEqual(filterReport(customers, 'bob', 'all'), [customers[1]]);
+
+  // Active customers tab
+  const activeOnly = filterReport(customers, '', 'active');
+  assert.equal(activeOnly.length, 2);
+  assert.deepEqual(activeOnly, [sample[0], sample[1]]);
+  assert.deepEqual(filterReport(customers, 'bob', 'active'), []);
+});
+

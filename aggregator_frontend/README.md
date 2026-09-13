@@ -59,4 +59,5 @@ npm start
 
 ## Integration note
 
-The browser calls the local Next.js `/api/report` route. That route requests the FastAPI `/api/report` endpoint server-side, keeping the frontend setup simple and avoiding local-development CORS issues.
+The frontend uses `BACKEND_API_URL` from `.env.local` to connect to the FastAPI backend service. In addition to proxy routes in Next.js (`/api/customers` and `/api/report`), the frontend provides an interactive tab navigation allowing users to toggle between **All customers** and **Active customers**.
+
